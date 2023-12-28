@@ -6,7 +6,7 @@ The `DataTableGameplayTag` plugin adds the following nodes to the engine:
 
 ### Get Data Table Row By Tag
 
-![ExternalContent/GetDataTableRowByTag.png](GetDataTableRowByTag.png)
+![Get Data Table Row By Tag](ExternalContent/GetDataTableRowByTag.png)
 
 This node allows you to retrieve a row from a data table by specifying a gameplay tag instead of the row name. This eliminates the need to specify the gameplay tag twice in the data table.
 
