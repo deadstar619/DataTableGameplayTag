@@ -12,7 +12,7 @@ This node allows you to retrieve a row from a data table by specifying a gamepla
 
 ### Get Data Table Row Tags
 
-![Get Data Table Row Tags](GetDataTableRowTags.png)
+![Get Data Table Row Tags](ExternalContent/GetDataTableRowTags.png)
 
 With this node, you can obtain all tags associated with the rows in a data table.
 
