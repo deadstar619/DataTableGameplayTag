@@ -1,4 +1,4 @@
-# DataTable GameplayTag nodes for unreal engine 5
+# DataTable GameplayTag nodes for Unreal Engine 5.3
 
 ## Overview
 
@@ -18,3 +18,5 @@ With this node, you can obtain all tags associated with the rows in a data table
 
 ## Installation
 Clone or download the repository and place into the plugins folder.
+
+I have only tested the plugin with 5.3 but should be working on 5.1.1 onwards.
