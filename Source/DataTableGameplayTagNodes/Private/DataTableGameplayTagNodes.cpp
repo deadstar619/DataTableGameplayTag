@@ -6,12 +6,10 @@
 
 void FDataTableGameplayTagNodesModule::StartupModule()
 {
-    
 }
 
 void FDataTableGameplayTagNodesModule::ShutdownModule()
 {
-    
 }
 
 #undef LOCTEXT_NAMESPACE
