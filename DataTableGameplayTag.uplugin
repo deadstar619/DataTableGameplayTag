@@ -23,6 +23,11 @@
 			"Name": "DataTableGameplayTagNodes",
 			"Type": "UncookedOnly",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "DataTableGameplayTagEditor",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "Default"
 		}
 	]
 }
