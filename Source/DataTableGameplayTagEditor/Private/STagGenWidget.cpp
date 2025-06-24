@@ -250,19 +250,6 @@ FString STagGenWidget::SafeName(const FName& Tag)
 
 FString STagGenWidget::BuildHeader(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS)
 {
-    /*static constexpr TCHAR HeaderTpl[] =
-        TEXT("#pragma once\n\n#include \"NativeGameplayTags.h\"\n\nnamespace %s\n{\n");
-    FString Out = FString::Printf(HeaderTpl, *NS);
-
-    for (const FGameplayTagTableRow* Row : Rows)
-    {
-        const FString Name = SafeName(Row->Tag);
-        Out += FString::Printf(TEXT("\t// %s\n\tUE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_%s_%s);\n\n"),
-            *Row->DevComment, *NS, *Name);
-    }
-    Out.Append(TEXT("}\n"));
-    return Out;*/
-
     static constexpr TCHAR HeaderTpl[] =
        TEXT("#pragma once\n\n#include \"NativeGameplayTags.h\"\n\nnamespace %s\n{\n");
     FString Out = FString::Printf(HeaderTpl, *NS);
