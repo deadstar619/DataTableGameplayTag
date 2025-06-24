@@ -21,27 +21,27 @@ public:
 	void Construct(const FArguments& InArgs);
 
 private:
-	/*********************  UI callbacks  *********************/
+	// UI callbacks
 	FReply OnGenerateClicked();
 	FReply OnChooseFolderClicked();
 	TSharedRef<SWidget> MakeDataTablePicker();
 	TSharedRef<SWidget> MakeModuleCombo();
 	FText GetPathPreviewText() const;
 
-	/*********************  Inputs  ***************************/
-	TSoftObjectPtr<UDataTable>            SourceTable;
-	FString                               NamespaceName = TEXT("Skill");
-	FString                               FileStem      = TEXT("SkillGameplayTags");
-
-	//  Module + relative directory
-	TArray<TSharedPtr<FModuleContextInfo>> Modules;
-	TSharedPtr<FModuleContextInfo>         SelectedModule;
-	FString                               RelPath; // relative to Public/Private
-
-	/*********************  Helpers  **************************/
+	// Helpers
 	bool WriteFiles();
 	static FString SafeName(const FName& Tag);
 	static FString BuildHeader(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS);
 	static FString BuildSource(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS, const FString& HeaderStem);
 	void ComputeOutputPaths(FString& OutHeader, FString& OutSource) const;
+	
+	// Inputs
+	TSoftObjectPtr<UDataTable> SourceTable;
+	FString NamespaceName = TEXT("");
+	FString FileStem = TEXT("");
+
+	// Module + relative directory
+	TArray<TSharedPtr<FModuleContextInfo>> Modules;
+	TSharedPtr<FModuleContextInfo> SelectedModule;
+	FString RelPath; // relative to Public/Private
 };

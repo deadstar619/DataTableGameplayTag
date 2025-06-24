@@ -257,16 +257,13 @@ FString STagGenWidget::BuildHeader(const TArray<FGameplayTagTableRow*>& Rows, co
     for (const FGameplayTagTableRow* Row : Rows)
     {
         const FString Name = SafeName(Row->Tag);
-        Out += FString::Printf(TEXT("\tUE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_%s_%s);\n"),
-            *NS, *Name);
+        Out += FString::Printf(TEXT("\tUE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_%s);\n"), *Name);
     }
     Out.Append(TEXT("}\n"));
     return Out;
 }
 
-FString STagGenWidget::BuildSource(const TArray<FGameplayTagTableRow*>& Rows,
-                                   const FString& NS,
-                                   const FString& HeaderStem)
+FString STagGenWidget::BuildSource(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS, const FString& HeaderStem)
 {
     // Determine the relative path for the include.
     FString IncludePath = HeaderStem + TEXT(".h");
@@ -278,8 +275,7 @@ FString STagGenWidget::BuildSource(const TArray<FGameplayTagTableRow*>& Rows,
     for (const FGameplayTagTableRow* Row : Rows)
     {
         const FString Name = SafeName(Row->Tag);
-        Out += FString::Printf(TEXT("\tUE_DEFINE_GAMEPLAY_TAG(TAG_%s_%s, \"%s\");\n"),
-            *NS, *Name, *Row->Tag.ToString());
+        Out += FString::Printf(TEXT("\tUE_DEFINE_GAMEPLAY_TAG(TAG_%s, \"%s\");\n"), *Name, *Row->Tag.ToString());
     }
     Out.Append(TEXT("}\n"));
     return Out;
