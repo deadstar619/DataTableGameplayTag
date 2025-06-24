@@ -15,12 +15,6 @@ struct FModuleContextInfo;
 class STagGenWidget : public SCompoundWidget
 {
 public:
-	enum class EClassLocation : uint8
-	{
-		Public,
-		Private
-	};
-
 	SLATE_BEGIN_ARGS(STagGenWidget) {}
 	SLATE_END_ARGS()
 
@@ -29,9 +23,9 @@ public:
 private:
 	/*********************  UI callbacks  *********************/
 	FReply OnGenerateClicked();
+	FReply OnChooseFolderClicked();
 	TSharedRef<SWidget> MakeDataTablePicker();
 	TSharedRef<SWidget> MakeModuleCombo();
-	TSharedRef<SWidget> MakeLocationChooser();
 	FText GetPathPreviewText() const;
 
 	/*********************  Inputs  ***************************/
@@ -42,17 +36,12 @@ private:
 	//  Module + relative directory
 	TArray<TSharedPtr<FModuleContextInfo>> Modules;
 	TSharedPtr<FModuleContextInfo>         SelectedModule;
-	FString                               RelPath = TEXT("GameplayTags");
-	TSharedPtr<SEditableTextBox>          RelPathEdit;
-	EClassLocation                        ClassLocation = EClassLocation::Public;
+	FString                               RelPath; // relative to Public/Private
 
 	/*********************  Helpers  **************************/
 	bool WriteFiles();
 	static FString SafeName(const FName& Tag);
-	static FString BuildHeader(const TArray<FGameplayTagTableRow*>& Rows,
-							   const FString& NS);
-	static FString BuildSource(const TArray<FGameplayTagTableRow*>& Rows,
-							   const FString& NS,
-							   const FString& HeaderStem);
+	static FString BuildHeader(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS);
+	static FString BuildSource(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS, const FString& HeaderStem);
 	void ComputeOutputPaths(FString& OutHeader, FString& OutSource) const;
 };

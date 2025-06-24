@@ -1,6 +1,4 @@
-﻿// Copyright 2025 Marco Santini. All rights reserved.
-
-#include "STagGenWidget.h"
+﻿#include "STagGenWidget.h"
 #include "AssetRegistry/AssetData.h"
 #include "ContentBrowserModule.h"
 #include "GameplayTagsManager.h"
@@ -9,12 +7,13 @@
 #include "Misc/MessageDialog.h"
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
+#include "DesktopPlatformModule.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Text/STextBlock.h"
-#include "Widgets/Input/SSegmentedControl.h"
+#include "Widgets/Layout/SBox.h"
 #include "Styling/AppStyle.h"
 
 #define LOCTEXT_NAMESPACE "GameplayTagGen"
@@ -30,6 +29,7 @@ void STagGenWidget::Construct(const FArguments&)
 
     ensure(Modules.Num() > 0);
     SelectedModule = Modules[0];
+    RelPath.Empty();
 
     ChildSlot
     [
@@ -76,33 +76,36 @@ void STagGenWidget::Construct(const FArguments&)
                     .OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type){ FileStem = T.ToString().TrimStartAndEnd(); })
                 ]
 
-                // Public/Private segmented control
-                + SVerticalBox::Slot().AutoHeight().Padding(2, 8, 2, 2)
-                [
-                    SNew(STextBlock).Text(LOCTEXT("LocationLabel", "Class Location"))
-                ]
-                + SVerticalBox::Slot().AutoHeight().Padding(2)
-                [
-                    MakeLocationChooser()
-                ]
-
                 // Destination (module + relative dir)
                 + SVerticalBox::Slot().AutoHeight().Padding(2, 8, 2, 2)
                 [
-                    SNew(STextBlock).Text(LOCTEXT("DestLabel", "Destination"))
+                    SNew(STextBlock).Text(LOCTEXT("DestLabel", "Destination Module & Folder (Public)"))
                 ]
                 + SVerticalBox::Slot().AutoHeight().Padding(2)
                 [
                     SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0,0,6,0)
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0,0,8,0)
                     [
                         MakeModuleCombo()
                     ]
                     + SHorizontalBox::Slot().FillWidth(1.f)
                     [
-                        SAssignNew(RelPathEdit, SEditableTextBox)
+                        SNew(SEditableTextBox)
                         .Text_Lambda([this]{ return FText::FromString(RelPath); })
-                        .OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type){ RelPath = T.ToString().TrimStartAndEnd(); })
+                        .IsReadOnly(true)
+                        .HintText(LOCTEXT("PublicSubdirHint", "Choose a subfolder (optional)"))
+                    ]
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(4,0,0,0)
+                    [
+                        SNew(SButton)
+                        .ToolTipText(LOCTEXT("ChooseFolderTT", "Choose a subfolder within the module's Public folder"))
+                        .ButtonStyle(FAppStyle::Get(), "SimpleButton")
+                        .OnClicked(this, &STagGenWidget::OnChooseFolderClicked)
+                        [
+                            SNew(SImage)
+                            .Image(FAppStyle::Get().GetBrush("Icons.FolderClosed"))
+                            .ColorAndOpacity(FSlateColor::UseForeground())
+                        ]
                     ]
                 ]
 
@@ -151,6 +154,7 @@ TSharedRef<SWidget> STagGenWidget::MakeModuleCombo()
         .OnSelectionChanged_Lambda([this](TSharedPtr<FModuleContextInfo> NewSel, ESelectInfo::Type)
         {
             SelectedModule = NewSel;
+            RelPath.Empty();
         })
         .OnGenerateWidget_Lambda([](TSharedPtr<FModuleContextInfo> M)
         {
@@ -161,14 +165,32 @@ TSharedRef<SWidget> STagGenWidget::MakeModuleCombo()
         ];
 }
 
-/*************************  Location chooser  **********************************/
-TSharedRef<SWidget> STagGenWidget::MakeLocationChooser()
+/*************************  Choose folder  ************************************/
+FReply STagGenWidget::OnChooseFolderClicked()
 {
-    return SNew(SSegmentedControl<EClassLocation>)
-        .Value_Lambda([this]{ return ClassLocation; })
-        .OnValueChanged_Lambda([this](EClassLocation NewVal){ ClassLocation = NewVal; })
-        + SSegmentedControl<EClassLocation>::Slot(EClassLocation::Public).Text(LOCTEXT("Public", "Public"))
-        + SSegmentedControl<EClassLocation>::Slot(EClassLocation::Private).Text(LOCTEXT("Private", "Private"));
+    IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+    if (!DesktopPlatform || !SelectedModule.IsValid())
+        return FReply::Handled();
+
+    TSharedPtr<SWindow> ParentWindow = FSlateApplication::Get().FindWidgetWindow(AsShared());
+    void* ParentWindowHandle = ParentWindow.IsValid() ? ParentWindow->GetNativeWindow()->GetOSWindowHandle() : nullptr;
+
+    FString PublicRoot = SelectedModule->ModuleSourcePath / TEXT("Public");
+    FString ChosenFolder;
+    const bool bPicked = DesktopPlatform->OpenDirectoryDialog(
+        ParentWindowHandle,
+        TEXT("Choose Header Folder (Public)"),
+        PublicRoot,
+        ChosenFolder
+    );
+    if (bPicked && ChosenFolder.StartsWith(PublicRoot))
+    {
+        FString Rel = ChosenFolder.Mid(PublicRoot.Len());
+        Rel.RemoveFromStart(TEXT("/"));
+        Rel.RemoveFromEnd(TEXT("/"));
+        RelPath = Rel;
+    }
+    return FReply::Handled();
 }
 
 /*************************  Path preview  **************************************/
@@ -228,7 +250,7 @@ FString STagGenWidget::SafeName(const FName& Tag)
 
 FString STagGenWidget::BuildHeader(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS)
 {
-    static constexpr TCHAR HeaderTpl[] =
+    /*static constexpr TCHAR HeaderTpl[] =
         TEXT("#pragma once\n\n#include \"NativeGameplayTags.h\"\n\nnamespace %s\n{\n");
     FString Out = FString::Printf(HeaderTpl, *NS);
 
@@ -239,6 +261,19 @@ FString STagGenWidget::BuildHeader(const TArray<FGameplayTagTableRow*>& Rows, co
             *Row->DevComment, *NS, *Name);
     }
     Out.Append(TEXT("}\n"));
+    return Out;*/
+
+    static constexpr TCHAR HeaderTpl[] =
+       TEXT("#pragma once\n\n#include \"NativeGameplayTags.h\"\n\nnamespace %s\n{\n");
+    FString Out = FString::Printf(HeaderTpl, *NS);
+
+    for (const FGameplayTagTableRow* Row : Rows)
+    {
+        const FString Name = SafeName(Row->Tag);
+        Out += FString::Printf(TEXT("\tUE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_%s_%s);\n"),
+            *NS, *Name);
+    }
+    Out.Append(TEXT("}\n"));
     return Out;
 }
 
@@ -246,14 +281,18 @@ FString STagGenWidget::BuildSource(const TArray<FGameplayTagTableRow*>& Rows,
                                    const FString& NS,
                                    const FString& HeaderStem)
 {
-    static constexpr TCHAR SrcTpl[] = TEXT("#include \"%s.h\"\n\nnamespace %s\n{\n");
-    FString Out = FString::Printf(SrcTpl, *HeaderStem, *NS);
+    // Determine the relative path for the include.
+    FString IncludePath = HeaderStem + TEXT(".h");
+    // If HeaderStem contains directories (eg: "Sub/Dir/SkillGameplayTags"), use as is.
+
+    static constexpr TCHAR SrcTpl[] = TEXT("#include \"%s\"\n\nnamespace %s\n{\n");
+    FString Out = FString::Printf(SrcTpl, *IncludePath, *NS);
 
     for (const FGameplayTagTableRow* Row : Rows)
     {
         const FString Name = SafeName(Row->Tag);
-        Out += FString::Printf(TEXT("\t// %s\n\tUE_DEFINE_GAMEPLAY_TAG(TAG_%s_%s, \"%s\");\n\n"),
-            *Row->DevComment, *NS, *Name, *Row->Tag.ToString());
+        Out += FString::Printf(TEXT("\tUE_DEFINE_GAMEPLAY_TAG(TAG_%s_%s, \"%s\");\n"),
+            *NS, *Name, *Row->Tag.ToString());
     }
     Out.Append(TEXT("}\n"));
     return Out;
@@ -263,17 +302,21 @@ void STagGenWidget::ComputeOutputPaths(FString& OutHeader, FString& OutSource) c
 {
     check(SelectedModule.IsValid());
 
-    // Root: <Module>/Source/
     FString Root = SelectedModule->ModuleSourcePath;
-    FString SubDir = (ClassLocation == EClassLocation::Public)
-        ? (Root / TEXT("Public") / RelPath)
-        : (Root / TEXT("Private") / RelPath);
+    FString PublicDir = Root / TEXT("Public");
+    FString PrivateDir = Root / TEXT("Private");
+    if (!RelPath.IsEmpty())
+    {
+        PublicDir /= RelPath;
+        PrivateDir /= RelPath;
+    }
+    FPaths::NormalizeDirectoryName(PublicDir);
+    FPaths::NormalizeDirectoryName(PrivateDir);
+    if (!PublicDir.EndsWith(TEXT("/"))) PublicDir.AppendChar('/');
+    if (!PrivateDir.EndsWith(TEXT("/"))) PrivateDir.AppendChar('/');
 
-    FPaths::NormalizeDirectoryName(SubDir);
-    if (!SubDir.EndsWith(TEXT("/"))) SubDir.AppendChar('/');
-
-    OutHeader = SubDir / (FileStem + TEXT(".h"));
-    OutSource = SubDir / (FileStem + TEXT(".cpp"));
+    OutHeader = PublicDir / (FileStem + TEXT(".h"));
+    OutSource = PrivateDir / (FileStem + TEXT(".cpp"));
 }
 
 /*************************  Write files  **************************************/
@@ -285,11 +328,17 @@ bool STagGenWidget::WriteFiles()
     ComputeOutputPaths(HeaderPath, SourcePath);
 
     // Create directory tree if needed
-    FString OutDir = FPaths::GetPath(HeaderPath);
+    FString OutHeaderDir = FPaths::GetPath(HeaderPath);
+    FString OutSourceDir = FPaths::GetPath(SourcePath);
     IFileManager& FM = IFileManager::Get();
-    if (!FM.MakeDirectory(*OutDir, /*Tree*/true))
+    if (!FM.MakeDirectory(*OutHeaderDir, /*Tree*/true))
     {
-        UE_LOG(LogTemp, Error, TEXT("Cannot create directory %s"), *OutDir);
+        UE_LOG(LogTemp, Error, TEXT("Cannot create directory %s"), *OutHeaderDir);
+        return false;
+    }
+    if (!FM.MakeDirectory(*OutSourceDir, /*Tree*/true))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Cannot create directory %s"), *OutSourceDir);
         return false;
     }
 
@@ -298,8 +347,22 @@ bool STagGenWidget::WriteFiles()
     SourceTable->GetAllRows(TEXT("TagGenWidget"), Rows);
 
     bool bOk = FFileHelper::SaveStringToFile(BuildHeader(Rows, NamespaceName), *HeaderPath);
-    bOk &= FFileHelper::SaveStringToFile(BuildSource(Rows, NamespaceName, FileStem), *SourcePath);
 
+    // Compute the relative header include
+    FString IncludeRel;
+    if (!RelPath.IsEmpty())
+    {
+        IncludeRel = RelPath / (FileStem + TEXT(".h"));  
+    }
+    else
+    {
+        IncludeRel = FileStem + TEXT(".h"); 
+    }
+
+    IncludeRel.ReplaceInline(TEXT("\\"), TEXT("/"));
+
+    bOk &= FFileHelper::SaveStringToFile(BuildSource(Rows, NamespaceName, IncludeRel), *SourcePath);
+    
     if (!bOk)
     {
         UE_LOG(LogTemp, Error, TEXT("Failed to write header or source file for gameplay tags"));
