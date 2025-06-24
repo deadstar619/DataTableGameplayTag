@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "GameplayTagContainer.h"
+#include "Blueprint/BlueprintExceptionInfo.h"
 #include "DataTableGameplayTagFunctionLibrary.generated.h"
 
 class UDataTable;
