@@ -13,6 +13,8 @@ public class DataTableGameplayTagEditor : ModuleRules
                 "CoreUObject",
                 "Engine",
                 "GameplayTags",
+                "GameProjectGeneration",
+                "InputCore",
                 "Slate",
                 "SlateCore",
                 "ToolMenus",

@@ -1,126 +1,168 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-#include "STagGenWidget.h"
+﻿#include "STagGenWidget.h"
 #include "AssetRegistry/AssetData.h"
 #include "ContentBrowserModule.h"
 #include "GameplayTagsManager.h"
 #include "IContentBrowserSingleton.h"
-#include "Widgets/Input/SEditableTextBox.h"
-#include "Widgets/Input/SButton.h"
-#include "Widgets/Layout/SScrollBox.h"
 #include "Misc/FileHelper.h"
 #include "Misc/MessageDialog.h"
 #include "Misc/Paths.h"
+#include "HAL/FileManager.h"
+#include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SComboBox.h"
+#include "Widgets/Layout/SScrollBox.h"
+#include "Widgets/Text/STextBlock.h"
+#include "Styling/AppStyle.h"
 
 #define LOCTEXT_NAMESPACE "GameplayTagGen"
 
+/***************************  Construct  **************************************/
 void STagGenWidget::Construct(const FArguments&)
 {
+	// Collect all C++ modules of this project (runtime & editor)
+	for (const FModuleContextInfo& M : GameProjectUtils::GetCurrentProjectModules())
+	{
+		Modules.Emplace(MakeShared<FModuleContextInfo>(M));
+	}
+	ensure(Modules.Num() > 0);
+	SelectedModule = Modules[0];
+
 	ChildSlot
 	[
-		SNew(SScrollBox)
-		+ SScrollBox::Slot()
+		SNew(SBorder)
+		.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
+		.Padding(8)
 		[
-			SNew(SVerticalBox)
+			SNew(SScrollBox)
+			+ SScrollBox::Slot()
+			[
+				SNew(SVerticalBox)
 
-			// DataTable picker
-			+ SVerticalBox::Slot().AutoHeight().Padding(4)
-			[
-				SNew(STextBlock).Text(LOCTEXT("DTLabel", "Source DataTable"))
-			]
-			+ SVerticalBox::Slot().AutoHeight().Padding(4)
-			[
-				MakeDataTablePicker()
-			]
+				// ───── DataTable picker ─────
+				+ SVerticalBox::Slot().AutoHeight().Padding(2)
+				[
+					SNew(STextBlock).Text(LOCTEXT("DTLabel", "Source DataTable"))
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(2)
+				[
+					MakeDataTablePicker()
+				]
 
-			// Namespace
-			+ SVerticalBox::Slot().AutoHeight().Padding(4)
-			[
-				SNew(STextBlock).Text(LOCTEXT("NamespaceLabel", "Namespace"))
-			]
-			+ SVerticalBox::Slot().AutoHeight().Padding(4)
-			[
-				SNew(SEditableTextBox)
-				.Text_Lambda([this]{ return FText::FromString(NamespaceName); })
-				.OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type) { NamespaceName = T.ToString(); })
-			]
+				// ───── Namespace ─────
+				+ SVerticalBox::Slot().AutoHeight().Padding(2)
+				[
+					SNew(STextBlock).Text(LOCTEXT("NSLabel", "Namespace"))
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(2)
+				[
+					SNew(SEditableTextBox)
+					.Text_Lambda([this]{ return FText::FromString(NamespaceName); })
+					.OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type){ NamespaceName = T.ToString().TrimStartAndEnd(); })
+				]
 
-			// Filename stem
-			+ SVerticalBox::Slot().AutoHeight().Padding(4)
-			[
-				SNew(STextBlock).Text(LOCTEXT("FileLabel", "File name (no extension)"))
-			]
-			+ SVerticalBox::Slot().AutoHeight().Padding(4)
-			[
-				SNew(SEditableTextBox)
-				.Text_Lambda([this]{ return FText::FromString(FileName); })
-				.OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type) { FileName = T.ToString(); })
-			]
+				// ───── File stem ─────
+				+ SVerticalBox::Slot().AutoHeight().Padding(2)
+				[
+					SNew(STextBlock).Text(LOCTEXT("FileStemLabel", "File name (no extension)"))
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(2)
+				[
+					SNew(SEditableTextBox)
+					.Text_Lambda([this]{ return FText::FromString(FileStem); })
+					.OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type){ FileStem = T.ToString().TrimStartAndEnd(); })
+				]
 
-			// Destination path
-			+ SVerticalBox::Slot().AutoHeight().Padding(4)
-			[
-				SNew(STextBlock).Text(LOCTEXT("DestLabel", "Destination (relative/absolute)"))
-			]
-			+ SVerticalBox::Slot().AutoHeight().Padding(4)
-			[
-				SNew(SEditableTextBox)
-				.Text_Lambda([this]{ return FText::FromString(Destination); })
-				.OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type) { Destination = T.ToString(); })
-			]
+				// ───── Destination (module + relative dir) ─────
+				+ SVerticalBox::Slot().AutoHeight().Padding(2, 8, 2, 2)
+				[
+					SNew(STextBlock).Text(LOCTEXT("DestLabel", "Destination"))
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(2)
+				[
+					SNew(SHorizontalBox)
 
-			// Generate button
-			+ SVerticalBox::Slot().AutoHeight().Padding(10)
-			.HAlign(HAlign_Left)
-			[
-				SNew(SButton)
-				.Text(LOCTEXT("Generate", "Generate"))
-				.OnClicked_Lambda([this](){ OnGenerateClicked(); return FReply::Handled(); })
+					// module combo
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0,0,6,0)
+					[
+						MakeModuleCombo()
+					]
+					// relative path edit
+					+ SHorizontalBox::Slot().FillWidth(1.f)
+					[
+						SAssignNew(RelPathEdit, SEditableTextBox)
+						.Text_Lambda([this]{ return FText::FromString(RelPath); })
+						.OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type){ RelPath = T.ToString().TrimStartAndEnd(); })
+					]
+				]
+
+				// ───── Generate button ─────
+				+ SVerticalBox::Slot().AutoHeight().Padding(4,10)
+				.HAlign(HAlign_Left)
+				[
+					SNew(SButton)
+					.Text(LOCTEXT("Generate", "Generate"))
+					.OnClicked(this, &STagGenWidget::OnGenerateClicked)
+				]
 			]
 		]
 	];
 }
 
-/* ---------------------------  UI HELPERS  --------------------------- */
-
+/*************************  Asset picker  *************************************/
 TSharedRef<SWidget> STagGenWidget::MakeDataTablePicker()
 {
 	FAssetPickerConfig Picker;
 	Picker.Filter.ClassPaths.Add(UDataTable::StaticClass()->GetClassPathName());
-	Picker.SelectionMode = ESelectionMode::Single;
-	Picker.bAllowNullSelection = false;
-	Picker.OnAssetSelected = FOnAssetSelected::CreateLambda([this](const FAssetData& Asset){
+	Picker.SelectionMode           = ESelectionMode::Single;
+	Picker.bAllowNullSelection     = false;
+	Picker.OnAssetSelected = FOnAssetSelected::CreateLambda([this](const FAssetData& Asset)
+	{
 		SourceTable = Cast<UDataTable>(Asset.GetAsset());
 	});
-	return FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser").Get().
-		CreateAssetPicker(Picker);
+
+	return FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser").Get().CreateAssetPicker(Picker);
 }
 
-void STagGenWidget::OnGenerateClicked()
+/*************************  Module combo  *************************************/
+TSharedRef<SWidget> STagGenWidget::MakeModuleCombo()
+{
+	return SNew(SComboBox<TSharedPtr<FModuleContextInfo>>)
+		.OptionsSource(&Modules)
+		.InitiallySelectedItem(SelectedModule)
+		.OnSelectionChanged_Lambda([this](TSharedPtr<FModuleContextInfo> NewSel, ESelectInfo::Type)
+		{
+			SelectedModule = NewSel;
+		})
+		.OnGenerateWidget_Lambda([](TSharedPtr<FModuleContextInfo> M)
+		{
+			return SNew(STextBlock).Text(FText::FromString(M->ModuleName));
+		})
+		[
+			SNew(STextBlock).Text_Lambda([this]{ return FText::FromString(SelectedModule->ModuleName); })
+		];
+}
+
+/*************************  Generate click  ***********************************/
+FReply STagGenWidget::OnGenerateClicked()
 {
 	if (!SourceTable.IsValid())
 	{
 		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("NoTable", "Please select a DataTable."));
-		return;
+		return FReply::Handled();
 	}
 
-	if (WriteFiles(SourceTable.Get(), NamespaceName, FileName, Destination))
+	if (WriteFiles())
 	{
-		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("Success", "Gameplay-tag files generated."));
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("Success", "Gameplay‑tag files generated."));
 	}
 	else
 	{
-		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("Fail", "Failed to write files."));
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("Fail", "Failed to write files. Check the log for details."));
 	}
+	return FReply::Handled();
 }
 
-/* --------------------------  GENERATION  ---------------------------- */
-
-static const FString HeaderTemplatePreamble =
-	TEXT("#pragma once\n\n#include \"NativeGameplayTags.h\"\n\nnamespace %s\n{\n");
-static const FString SourceTemplatePreamble =
-	TEXT("#include \"%s.h\"\n\nnamespace %s\n{\n");
-
+/*************************  Helper utils  *************************************/
 FString STagGenWidget::SafeName(const FName& Tag)
 {
 	FString R = Tag.ToString();
@@ -130,50 +172,70 @@ FString STagGenWidget::SafeName(const FName& Tag)
 
 FString STagGenWidget::BuildHeader(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS)
 {
-	FString Out = FString::Printf(
-		TEXT("#pragma once\n\n#include \"NativeGameplayTags.h\"\n\nnamespace %s\n{\n"),
-		*NS);
+	static constexpr TCHAR HeaderTpl[] =
+		TEXT("#pragma once\n\n#include \"NativeGameplayTags.h\"\n\nnamespace %s\n{\n");
+	FString Out = FString::Printf(HeaderTpl, *NS);
 
-	for (const auto* Row : Rows)
+	for (const FGameplayTagTableRow* Row : Rows)
 	{
 		const FString Name = SafeName(Row->Tag);
-		Out += FString::Printf(
-			TEXT("\t// %s\n\tUE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_%s_%s);\n\n"),
+		Out += FString::Printf(TEXT("\t// %s\n\tUE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_%s_%s);\n\n"),
 			*Row->DevComment, *NS, *Name);
 	}
-	Out += TEXT("}\n");
+	Out.Append(TEXT("}\n"));
 	return Out;
 }
 
-FString STagGenWidget::BuildSource(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS)
+FString STagGenWidget::BuildSource(const TArray<FGameplayTagTableRow*>& Rows,
+                                   const FString& NS,
+                                   const FString& HeaderStem)
 {
-	FString Out = FString::Printf(
-		TEXT("#include \"%s.h\"\n\nnamespace %s\n{\n"),
-		*NS,   // header file stem
-		*NS);  // namespace
+	static constexpr TCHAR SrcTpl[] = TEXT("#include \"%s.h\"\n\nnamespace %s\n{\n");
+	FString Out = FString::Printf(SrcTpl, *HeaderStem, *NS);
 
-	for (const auto* Row : Rows)
+	for (const FGameplayTagTableRow* Row : Rows)
 	{
 		const FString Name = SafeName(Row->Tag);
-		Out += FString::Printf(
-			TEXT("\t// %s\n\tUE_DEFINE_GAMEPLAY_TAG(TAG_%s_%s, \"%s\");\n\n"),
+		Out += FString::Printf(TEXT("\t// %s\n\tUE_DEFINE_GAMEPLAY_TAG(TAG_%s_%s, \"%s\");\n\n"),
 			*Row->DevComment, *NS, *Name, *Row->Tag.ToString());
 	}
-	Out += TEXT("}\n");
+	Out.Append(TEXT("}\n"));
 	return Out;
 }
 
-bool STagGenWidget::WriteFiles(UDataTable* Table, const FString& NS,
-                               const FString& FileStem, const FString& OutDir)
+/*************************  Write files  **************************************/
+bool STagGenWidget::WriteFiles()
 {
+	check(SelectedModule.IsValid());
+
+	// Resolve destination directory:  <Module>/Source/<RelPath>/
+	FString OutDir = SelectedModule->ModuleSourcePath / RelPath;
+	FPaths::NormalizeDirectoryName(OutDir);
+	if (!OutDir.EndsWith(TEXT("/"))) OutDir.AppendChar('/');
+
+	// Create directory tree if needed
+	IFileManager& FM = IFileManager::Get();
+	if (!FM.MakeDirectory(*OutDir, /*Tree*/true))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Cannot create directory %s"), *OutDir);
+		return false;
+	}
+
+	// Gather rows
 	TArray<FGameplayTagTableRow*> Rows;
-	Table->GetAllRows(TEXT("TagGenWidget"), Rows);
+	SourceTable->GetAllRows(TEXT("TagGenWidget"), Rows);
 
-	const FString HeaderPath = FPaths::ConvertRelativePathToFull(FPaths::Combine(OutDir, FileStem + TEXT(".h")));
-	const FString SourcePath = FPaths::ConvertRelativePathToFull(FPaths::Combine(OutDir, FileStem + TEXT(".cpp")));
+	const FString HeaderPath = OutDir / (FileStem + TEXT(".h"));
+	const FString SourcePath = OutDir / (FileStem + TEXT(".cpp"));
 
-	return	FFileHelper::SaveStringToFile(BuildHeader(Rows, NS), *HeaderPath) &&
-			FFileHelper::SaveStringToFile(BuildSource(Rows, NS), *SourcePath);
+	bool bOk = FFileHelper::SaveStringToFile(BuildHeader(Rows, NamespaceName), *HeaderPath);
+	bOk &= FFileHelper::SaveStringToFile(BuildSource(Rows, NamespaceName, FileStem), *SourcePath);
+
+	if (!bOk)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to write header or source file for gameplay tags"));
+	}
+	return bOk;
 }
 
 #undef LOCTEXT_NAMESPACE

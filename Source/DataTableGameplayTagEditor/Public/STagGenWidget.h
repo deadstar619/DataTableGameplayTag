@@ -4,6 +4,13 @@
 
 #include "Widgets/SCompoundWidget.h"
 #include "Engine/DataTable.h"
+#include "GameProjectUtils.h"
+#include "Templates/SharedPointer.h"
+#include "Input/Reply.h"
+
+class SEditableTextBox;
+struct FGameplayTagTableRow;
+struct FModuleContextInfo;
 
 class STagGenWidget : public SCompoundWidget
 {
@@ -11,23 +18,31 @@ public:
 	SLATE_BEGIN_ARGS(STagGenWidget) {}
 	SLATE_END_ARGS()
 
-	void Construct(const FArguments&);
+	void Construct(const FArguments& InArgs);
 
 private:
-	// UI callbacks
-	void OnGenerateClicked();
+	/*********************  UI callbacks  *********************/
+	FReply OnGenerateClicked();
 	TSharedRef<SWidget> MakeDataTablePicker();
+	TSharedRef<SWidget> MakeModuleCombo();
 
-	// Input fields
-	TSoftObjectPtr<UDataTable> SourceTable;
-	FString NamespaceName = TEXT("Skill");
-	FString FileName      = TEXT("SkillGameplayTags");
-	FString Destination   = TEXT("../GameplayTags/");
+	/*********************  Inputs  ***************************/
+	TSoftObjectPtr<UDataTable>            SourceTable;
+	FString                               NamespaceName = TEXT("Skill");
+	FString                               FileStem      = TEXT("SkillGameplayTags");
 
-	// Helpers
-	static bool WriteFiles(UDataTable* Table, const FString& Namespace,
-						   const FString& FileStem, const FString& OutDir);
-	static FString SafeName  (const FName& Tag);
-	static FString BuildHeader(const TArray<struct FGameplayTagTableRow*>& Rows, const FString& Namespace);
-	static FString BuildSource(const TArray<struct FGameplayTagTableRow*>& Rows, const FString& Namespace);
+	//  Module + relative directory
+	TArray<TSharedPtr<FModuleContextInfo>> Modules;
+	TSharedPtr<FModuleContextInfo>         SelectedModule;
+	FString                               RelPath = TEXT("GameplayTags");
+	TSharedPtr<SEditableTextBox>          RelPathEdit;
+
+	/*********************  Helpers  **************************/
+	bool WriteFiles();
+	static FString SafeName(const FName& Tag);
+	static FString BuildHeader(const TArray<FGameplayTagTableRow*>& Rows,
+							   const FString& NS);
+	static FString BuildSource(const TArray<FGameplayTagTableRow*>& Rows,
+							   const FString& NS,
+							   const FString& HeaderStem);
 };
