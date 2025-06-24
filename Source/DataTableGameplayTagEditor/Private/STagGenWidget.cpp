@@ -21,12 +21,17 @@
 /***************************  Construct  **************************************/
 void STagGenWidget::Construct(const FArguments&)
 {
-    // Collect all C++ modules of this project (runtime, editor, plugin)
+    // Collect all C++ modules of this project including plugins.
     for (const FModuleContextInfo& M : GameProjectUtils::GetCurrentProjectModules())
+    {
         Modules.Emplace(MakeShared<FModuleContextInfo>(M));
-    for (const FModuleContextInfo& M : GameProjectUtils::GetCurrentProjectPluginModules())
-        Modules.Emplace(MakeShared<FModuleContextInfo>(M));
+    }
 
+    for (const FModuleContextInfo& M : GameProjectUtils::GetCurrentProjectPluginModules())
+    {
+        Modules.Emplace(MakeShared<FModuleContextInfo>(M));   
+    }
+    
     ensure(Modules.Num() > 0);
     SelectedModule = Modules[0];
     RelPath.Empty();
@@ -61,7 +66,8 @@ void STagGenWidget::Construct(const FArguments&)
                 [
                     SNew(SEditableTextBox)
                     .Text_Lambda([this]{ return FText::FromString(NamespaceName); })
-                    .OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type){ NamespaceName = T.ToString().TrimStartAndEnd(); })
+                    //.OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type){ NamespaceName = T.ToString().TrimStartAndEnd(); })
+                    .OnTextChanged_Lambda([this](const FText& T){ NamespaceName = T.ToString().TrimStartAndEnd(); })
                 ]
 
                 // File stem
@@ -73,7 +79,8 @@ void STagGenWidget::Construct(const FArguments&)
                 [
                     SNew(SEditableTextBox)
                     .Text_Lambda([this]{ return FText::FromString(FileStem); })
-                    .OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type){ FileStem = T.ToString().TrimStartAndEnd(); })
+                    //.OnTextCommitted_Lambda([this](const FText& T, ETextCommit::Type){ FileStem = T.ToString().TrimStartAndEnd(); })
+                    .OnTextChanged_Lambda([this](const FText& T){ FileStem = T.ToString().TrimStartAndEnd(); })
                 ]
 
                 // Destination (module + relative dir)
@@ -107,23 +114,67 @@ void STagGenWidget::Construct(const FArguments&)
                             .ColorAndOpacity(FSlateColor::UseForeground())
                         ]
                     ]
-                ]
 
+                    // Generate button
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(4,0,0,0)
+                    [
+                        SNew(SButton)
+                       .Text(LOCTEXT("Generate", "Generate"))
+                       .IsEnabled_Lambda([this]{ return CanGenerate(); })
+                       .OnClicked(this, &STagGenWidget::OnGenerateClicked)
+                    ]
+                ]
+                
                 // Path preview
                 + SVerticalBox::Slot().AutoHeight().Padding(2, 8, 2, 2)
                 [
                     SNew(STextBlock)
                     .Font(FAppStyle::GetFontStyle("Monospaced"))
                     .Text(this, &STagGenWidget::GetPathPreviewText)
+                    .ColorAndOpacity_Lambda([this]
+                    {
+                       return CanGenerate() ? FSlateColor::UseForeground() : FSlateColor(FLinearColor::Red);
+                    })
                 ]
 
-                // Generate button
-                + SVerticalBox::Slot().AutoHeight().Padding(4,10)
-                .HAlign(HAlign_Left)
+                // Error message
+                + SVerticalBox::Slot().AutoHeight().Padding(2, 0, 2, 8)
                 [
-                    SNew(SButton)
-                    .Text(LOCTEXT("Generate", "Generate"))
-                    .OnClicked(this, &STagGenWidget::OnGenerateClicked)
+                    SNew(STextBlock)
+                    .Text(this, &STagGenWidget::GetErrorMessage)
+                    .ColorAndOpacity(FLinearColor::Red)
+                    .Visibility_Lambda([this]{ return CanGenerate() ? EVisibility::Collapsed : EVisibility::Visible; })
+                    .WrapTextAt(320.f)
+                ]
+
+                // Live preview
+                + SVerticalBox::Slot().AutoHeight().Padding(2,8,2,2)
+                [
+                    SNew(STextBlock).Text(LOCTEXT("HeaderPreview", "Header preview:"))
+                ]
+                + SVerticalBox::Slot().AutoHeight().Padding(2)
+                [
+                    SNew(SBox)
+                    .MinDesiredHeight(90)
+                    [
+                        SNew(STextBlock)
+                        .Font(FAppStyle::GetFontStyle("Monospaced"))
+                        .Text(this, &STagGenWidget::GetHeaderPreviewText)
+                    ]
+                ]
+                + SVerticalBox::Slot().AutoHeight().Padding(2,8,2,2)
+                [
+                    SNew(STextBlock).Text(LOCTEXT("SourcePreview", "Source preview:"))
+                ]
+                + SVerticalBox::Slot().AutoHeight().Padding(2)
+                [
+                    SNew(SBox)
+                    .MinDesiredHeight(90)
+                    [
+                        SNew(STextBlock)
+                        .Font(FAppStyle::GetFontStyle("Monospaced"))
+                        .Text(this, &STagGenWidget::GetSourcePreviewText)
+                    ]
                 ]
             ]
         ]
@@ -351,6 +402,54 @@ bool STagGenWidget::WriteFiles()
         UE_LOG(LogTemp, Error, TEXT("Failed to write header or source file for gameplay tags"));
     }
     return bOk;
+}
+
+// More UI callbacks and helpers
+
+bool STagGenWidget::CanGenerate() const
+{
+    return SourceTable.IsValid() &&
+           !NamespaceName.IsEmpty() &&
+           !FileStem.IsEmpty() &&
+           SelectedModule.IsValid();
+}
+
+FText STagGenWidget::GetErrorMessage() const
+{
+    if (!SourceTable.IsValid())
+        return LOCTEXT("ErrNoTable", "Please select a DataTable.");
+    if (NamespaceName.IsEmpty())
+        return LOCTEXT("ErrNoNS", "Please enter a namespace.");
+    if (FileStem.IsEmpty())
+        return LOCTEXT("ErrNoStem", "Please enter a file name.");
+    if (!SelectedModule.IsValid())
+        return LOCTEXT("ErrNoMod", "Please select a module.");
+    return FText::GetEmpty();
+}
+
+FText STagGenWidget::GetHeaderPreviewText() const
+{
+    if (!CanGenerate())
+        return FText::GetEmpty();
+
+    TArray<FGameplayTagTableRow*> Rows;
+    if (SourceTable.IsValid())
+        SourceTable->GetAllRows(TEXT("TagGenWidgetPreview"), Rows);
+    return FText::FromString(BuildHeader(Rows, NamespaceName));
+}
+
+FText STagGenWidget::GetSourcePreviewText() const
+{
+    if (!CanGenerate())
+        return FText::GetEmpty();
+
+    TArray<FGameplayTagTableRow*> Rows;
+    if (SourceTable.IsValid())
+        SourceTable->GetAllRows(TEXT("TagGenWidgetPreview"), Rows);
+
+    FString IncludeRel = !RelPath.IsEmpty() ? RelPath / (FileStem + TEXT(".h")) : FileStem + TEXT(".h");
+    IncludeRel.ReplaceInline(TEXT("\\"), TEXT("/"));
+    return FText::FromString(BuildSource(Rows, NamespaceName, IncludeRel));
 }
 
 #undef LOCTEXT_NAMESPACE

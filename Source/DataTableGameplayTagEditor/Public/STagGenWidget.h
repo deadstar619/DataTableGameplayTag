@@ -26,8 +26,13 @@ private:
 	FReply OnChooseFolderClicked();
 	TSharedRef<SWidget> MakeDataTablePicker();
 	TSharedRef<SWidget> MakeModuleCombo();
+	bool CanGenerate() const;
+	
 	FText GetPathPreviewText() const;
-
+	FText GetHeaderPreviewText() const;
+	FText GetSourcePreviewText() const;
+	FText GetErrorMessage() const;
+	
 	// Helpers
 	bool WriteFiles();
 	static FString SafeName(const FName& Tag);
