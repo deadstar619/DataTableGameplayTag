@@ -37,7 +37,7 @@ private:
 	bool WriteFiles();
 	static FString SafeName(const FName& Tag);
 	static FString BuildHeader(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS);
-	static FString BuildSource(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS, const FString& HeaderStem);
+	static FString BuildSource(const TArray<FGameplayTagTableRow*>& Rows, const FString& NS, const FString& HeaderPathWithExt);
 	void ComputeOutputPaths(FString& OutHeader, FString& OutSource) const;
 	
 	// Inputs
