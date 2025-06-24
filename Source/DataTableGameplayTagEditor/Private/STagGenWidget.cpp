@@ -110,16 +110,16 @@ void STagGenWidget::Construct(const FArguments&)
                     + SScrollBox::Slot().Padding(2,6,2,2)
                     [
                         SNew(SGridPanel).FillColumn(1,1.f)
-                        + SGridPanel::Slot(0,0).VAlign(VAlign_Center).Padding(2)
-                        [ MakeLabel(LOCTEXT("ModuleLabel", "Module")) ]
-                        + SGridPanel::Slot(1,0).Padding(2)
-                        [ MakeModuleCombo() ]
-                        + SGridPanel::Slot(0,1).VAlign(VAlign_Center).Padding(2)
-                        [ MakeLabel(LOCTEXT("FolderLabel", "Folder")) ]
                         + SGridPanel::Slot(1,1).Padding(0,2,4,2)
                         [
                             SNew(SHorizontalBox)
-                            + SHorizontalBox::Slot().FillWidth(1.f)
+                            + SHorizontalBox::Slot().AutoWidth().Padding(2)
+                            [ MakeLabel(LOCTEXT("ModuleLabel", "Module")) ]
+                            + SHorizontalBox::Slot().AutoWidth()
+                            [ MakeModuleCombo() ]
+                            + SHorizontalBox::Slot().AutoWidth().Padding(2)
+                            [ MakeLabel(LOCTEXT("FolderLabel", "Folder")) ]
+                            + SHorizontalBox::Slot().FillWidth(0.4f)
                             [
                                 SNew(SEditableTextBox)
                                 .IsReadOnly(true)
@@ -134,17 +134,19 @@ void STagGenWidget::Construct(const FArguments&)
                                 .OnClicked(this, &STagGenWidget::OnChooseFolderClicked)
                                 [ SNew(SImage).Image(FAppStyle::Get().GetBrush("Icons.FolderClosed")) ]
                             ]
+                            // Generate button
+                            + SHorizontalBox::Slot().AutoWidth().Padding(4,0)
+                            [
+                                SNew(SButton)
+                                .Text(LOCTEXT("Generate", "Generate"))
+                                .IsEnabled_Lambda([this] { return CanGenerate(); })
+                                .OnClicked(this, &STagGenWidget::OnGenerateClicked)
+                            ]
                         ]
                     ]
-                ]
-
-                // RIGHT (40%)
-                + SHorizontalBox::Slot().FillWidth(0.40f).Padding(8,0,0,0)
-                [
-                    SNew(SScrollBox)
 
                     // Path preview + error
-                    + SScrollBox::Slot().Padding(2)
+                    + SScrollBox::Slot().Padding(2, 12, 2, 2)
                     [
                         SNew(STextBlock)
                         .Font(FAppStyle::GetFontStyle("Monospaced"))
@@ -160,34 +162,64 @@ void STagGenWidget::Construct(const FArguments&)
                         .WrapTextAt(400.f)
                     ]
 
-                    // Header preview
-                    + SScrollBox::Slot().Padding(2,12,2,2)
-                    [ SNew(STextBlock).Text(LOCTEXT("HeaderPrevLbl", "Header:")) ]
-                    + SScrollBox::Slot().Padding(2)
+                    // BOTTOM ACTION ROW
+                    /*+ SScrollBox::Slot().Padding(2,12,2,2).HAlign(HAlign_Fill)
                     [
-                        SNew(SBox).MinDesiredHeight(90)
-                        [ SNew(STextBlock).Font(FAppStyle::GetFontStyle("Monospaced")).Text(this, &STagGenWidget::GetHeaderPreviewText) ]
-                    ]
+                        SNew(SButton)
+                        .Text(LOCTEXT("Generate", "Generate"))
+                        .IsEnabled_Lambda([this]{ return CanGenerate(); })
+                        .OnClicked(this, &STagGenWidget::OnGenerateClicked)
+                    ]*/
+                ]
 
-                    // Source preview
-                    + SScrollBox::Slot().Padding(2,12,2,2)
-                    [ SNew(STextBlock).Text(LOCTEXT("SourcePrevLbl", "Source:")) ]
-                    + SScrollBox::Slot().Padding(2)
-                    [
-                        SNew(SBox).MinDesiredHeight(90)
-                        [ SNew(STextBlock).Font(FAppStyle::GetFontStyle("Monospaced")).Text(this, &STagGenWidget::GetSourcePreviewText) ]
-                    ]
+                // RIGHT (40%)
+                + SHorizontalBox::Slot().FillWidth(0.40f).Padding(8,0,0,0)
+                [
+                    SNew(SBorder) // Brushes.Panel - SuggestionTextBox.Background
+                   .BorderImage(FAppStyle::Get().GetBrush("Brushes.Title"))
+                   .Padding(4)
+                   [
+                       SNew(SScrollBox)
+
+                       // Header preview
+                       + SScrollBox::Slot().Padding(2,12,2,2)
+                       [ SNew(STextBlock).Text(LOCTEXT("HeaderPrevLbl", "Header:")).ColorAndOpacity(FLinearColor::Green) ] 
+                       + SScrollBox::Slot().Padding(24)
+                       [
+                           SNew(SBox).MinDesiredHeight(90)
+                           [
+                               SNew(STextBlock)
+                               .Font(FAppStyle::GetFontStyle("Monospaced"))
+                               .Text(this, &STagGenWidget::GetHeaderPreviewText)
+                               .ColorAndOpacity(FLinearColor::White)          // white on dark bg
+                           ]
+                       ]
+
+                       // Source preview
+                       + SScrollBox::Slot().Padding(2,12,2,2)
+                       [ SNew(STextBlock).Text(LOCTEXT("SourcePrevLbl", "Source:")).ColorAndOpacity(FLinearColor::Green) ]
+                       + SScrollBox::Slot().Padding(24)
+                       [
+                           SNew(SBox).MinDesiredHeight(90)
+                           [
+                               SNew(STextBlock)
+                               .Font(FAppStyle::GetFontStyle("Monospaced"))
+                               .Text(this, &STagGenWidget::GetSourcePreviewText)
+                               .ColorAndOpacity(FLinearColor::White)
+                           ]
+                       ]
+                   ]
                 ]
             ]
 
             // BOTTOM ACTION ROW
-            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0,6,0,0)
+            /*+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0,6,0,0)
             [
                 SNew(SButton)
                 .Text(LOCTEXT("Generate", "Generate"))
                 .IsEnabled_Lambda([this]{ return CanGenerate(); })
                 .OnClicked(this, &STagGenWidget::OnGenerateClicked)
-            ]
+            ]*/
         ]
     ];
 }
@@ -264,7 +296,7 @@ FText STagGenWidget::GetPathPreviewText() const
     FString HeaderPath, SourcePath;
     ComputeOutputPaths(HeaderPath, SourcePath);
 
-    FString Preview = FString::Printf(TEXT("Will generate:\n%s\n%s"), *HeaderPath, *SourcePath);
+    FString Preview = FString::Printf(TEXT("Will generate:\n\n%s\n%s"), *HeaderPath, *SourcePath);
     return FText::FromString(Preview);
 }
 
@@ -452,7 +484,12 @@ FText STagGenWidget::GetHeaderPreviewText() const
     TArray<FGameplayTagTableRow*> Rows;
     if (SourceTable.IsValid())
     {
-        SourceTable->GetAllRows(TEXT("TagGenWidgetPreview"), Rows);   
+        // Get the first 3 rows for preview (if there are more than 3)
+        SourceTable->GetAllRows(TEXT("TagGenWidgetPreview"), Rows);
+        if (Rows.Num() > 3)
+        {
+            Rows.SetNum(3);
+        }
     }
        
     return FText::FromString(BuildHeader(Rows, NamespaceName));
@@ -468,7 +505,12 @@ FText STagGenWidget::GetSourcePreviewText() const
     TArray<FGameplayTagTableRow*> Rows;
     if (SourceTable.IsValid())
     {
-        SourceTable->GetAllRows(TEXT("TagGenWidgetPreview"), Rows);   
+        // Get the first 3 rows for preview (if there are more than 3)
+        SourceTable->GetAllRows(TEXT("TagGenWidgetPreview"), Rows);
+        if (Rows.Num() > 3)
+        {
+            Rows.SetNum(3);
+        }
     }
     
     FString IncludeRel = !RelPath.IsEmpty() ? RelPath / (FileStem + TEXT(".h")) : FileStem + TEXT(".h");
