@@ -15,6 +15,7 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBox.h"
 #include "Styling/AppStyle.h"
+#include "Widgets/Layout/SUniformGridPanel.h"
 
 #define LOCTEXT_NAMESPACE "GameplayTagGen"
 
@@ -36,7 +37,7 @@ void STagGenWidget::Construct(const FArguments&)
     SelectedModule = Modules[0];
     RelPath.Empty();
 
-    ChildSlot
+    /*ChildSlot
     [
         SNew(SBorder)
         .BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
@@ -176,6 +177,177 @@ void STagGenWidget::Construct(const FArguments&)
                         .Text(this, &STagGenWidget::GetSourcePreviewText)
                     ]
                 ]
+            ]
+        ]
+    ];*/
+
+      /* ---------------- Helper: right‑aligned label ---------------- */
+    auto MakeLabel = [](const FText& Txt)
+    {
+        return SNew(STextBlock)
+               .Text(Txt)
+               .Justification(ETextJustify::Right);
+    };
+
+    /* =====================  UI ROOT  ============================ */
+    ChildSlot
+    [
+        SNew(SBorder)
+        .BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
+        .Padding(6)
+        [
+            SNew(SVerticalBox)
+
+            /* =============  MAIN SPLIT  (Left / Right) ============== */
+            + SVerticalBox::Slot().FillHeight(1.f)
+            [
+                SNew(SHorizontalBox)
+
+                /* -------------------  LEFT  --------------------- */
+                + SHorizontalBox::Slot().FillWidth(0.45f)
+                [
+                    SNew(SVerticalBox)
+
+                    /* INPUTS -------------------------------------------------- */
+                    + SVerticalBox::Slot().AutoHeight()
+                    [
+                        SNew(SExpandableArea)
+                        .InitiallyCollapsed(false)
+                        .Padding(2)
+                        .HeaderContent()[ SNew(STextBlock).Text(LOCTEXT("InputsHeader", "Inputs")) ]
+                        .BodyContent()
+                        [
+                            SNew(SVerticalBox)
+
+                            // DataTable label (stacked)
+                            + SVerticalBox::Slot().AutoHeight().Padding(0,2)
+                            [ SNew(STextBlock).Text(LOCTEXT("DTLabel", "Source DataTable")) ]
+                            + SVerticalBox::Slot().AutoHeight().Padding(0,2,0,4)
+                            [ MakeDataTablePicker() ]
+
+                            // Grid with Namespace + FileStem
+                            + SVerticalBox::Slot().AutoHeight()
+                            [
+                                SNew(SGridPanel).FillColumn(1,1.f)
+                                + SGridPanel::Slot(0,0).VAlign(VAlign_Center).Padding(2)
+                                [ MakeLabel(LOCTEXT("NSLabel", "Namespace")) ]
+                                + SGridPanel::Slot(1,0).Padding(2)
+                                [
+                                    SNew(SEditableTextBox)
+                                    .Text_Lambda([this]{ return FText::FromString(NamespaceName); })
+                                    .OnTextChanged_Lambda([this](const FText& T){ NamespaceName = T.ToString().TrimStartAndEnd(); })
+                                ]
+                                + SGridPanel::Slot(0,1).VAlign(VAlign_Center).Padding(2)
+                                [ MakeLabel(LOCTEXT("StemLabel", "File name")) ]
+                                + SGridPanel::Slot(1,1).Padding(2)
+                                [
+                                    SNew(SEditableTextBox)
+                                    .Text_Lambda([this]{ return FText::FromString(FileStem); })
+                                    .OnTextChanged_Lambda([this](const FText& T){ FileStem = T.ToString().TrimStartAndEnd(); })
+                                ]
+                            ]
+                        ]
+                    ]
+
+                    /* DESTINATION ------------------------------------------- */
+                    + SVerticalBox::Slot().AutoHeight().Padding(0,6,0,0)
+                    [
+                        SNew(SExpandableArea)
+                        .InitiallyCollapsed(false)
+                        .Padding(2)
+                        .HeaderContent()[ SNew(STextBlock).Text(LOCTEXT("DestHeader", "Destination")) ]
+                        .BodyContent()
+                        [
+                            SNew(SGridPanel).FillColumn(1,1.f)
+
+                            // Module picker
+                            + SGridPanel::Slot(0,0).VAlign(VAlign_Center).Padding(2)
+                            [ MakeLabel(LOCTEXT("ModuleLabel", "Module")) ]
+                            + SGridPanel::Slot(1,0).Padding(2)
+                            [ MakeModuleCombo() ]
+
+                            // Folder picker row (editable + browse)
+                            + SGridPanel::Slot(0,1).VAlign(VAlign_Center).Padding(2)
+                            [ MakeLabel(LOCTEXT("FolderLabel", "Folder")) ]
+                            + SGridPanel::Slot(1,1).Padding(0,2,4,2)
+                            [
+                                SNew(SHorizontalBox)
+                                + SHorizontalBox::Slot().FillWidth(1.f)
+                                [
+                                    SNew(SEditableTextBox)
+                                    .IsReadOnly(true)
+                                    .Text_Lambda([this]{ return FText::FromString(RelPath); })
+                                    .HintText(LOCTEXT("FolderHint", "Optional sub-folder"))
+                                ]
+                                + SHorizontalBox::Slot().AutoWidth().Padding(4,0)
+                                [
+                                    SNew(SButton)
+                                    .ButtonStyle(FAppStyle::Get(), "SimpleButton")
+                                    .ToolTipText(LOCTEXT("BrowseTT", "Choose sub-folder"))
+                                    .OnClicked(this, &STagGenWidget::OnChooseFolderClicked)
+                                    [ SNew(SImage).Image(FAppStyle::Get().GetBrush("Icons.FolderClosed")) ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+
+                /* -------------------  RIGHT  -------------------- */
+                + SHorizontalBox::Slot().FillWidth(0.55f).Padding(8,0,0,0)
+                [
+                    SNew(SExpandableArea)
+                    .InitiallyCollapsed(true)
+                    .Padding(2)
+                    .HeaderContent()[ SNew(STextBlock).Text(LOCTEXT("PreviewHeader", "Preview")) ]
+                    .BodyContent()
+                    [
+                        SNew(SVerticalBox)
+
+                        // File paths + error
+                        + SVerticalBox::Slot().AutoHeight().Padding(2)
+                        [
+                            SNew(STextBlock)
+                            .Font(FAppStyle::GetFontStyle("Monospaced"))
+                            .Text(this, &STagGenWidget::GetPathPreviewText)
+                            .ColorAndOpacity_Lambda([this]{ return CanGenerate() ? FSlateColor::UseForeground() : FSlateColor(FLinearColor::Red); })
+                        ]
+                        + SVerticalBox::Slot().AutoHeight().Padding(2)
+                        [
+                            SNew(STextBlock)
+                            .Text(this, &STagGenWidget::GetErrorMessage)
+                            .ColorAndOpacity(FLinearColor::Red)
+                            .Visibility_Lambda([this]{ return CanGenerate() ? EVisibility::Collapsed : EVisibility::Visible; })
+                            .WrapTextAt(360.f)
+                        ]
+
+                        // Header preview
+                        + SVerticalBox::Slot().AutoHeight().Padding(2,6,2,2)
+                        [ SNew(STextBlock).Text(LOCTEXT("HeaderPrevLbl", "Header:")) ]
+                        + SVerticalBox::Slot().AutoHeight().Padding(2)
+                        [
+                            SNew(SBox).MinDesiredHeight(90)
+                            [ SNew(STextBlock).Font(FAppStyle::GetFontStyle("Monospaced")).Text(this, &STagGenWidget::GetHeaderPreviewText) ]
+                        ]
+
+                        // Source preview
+                        + SVerticalBox::Slot().AutoHeight().Padding(2,6,2,2)
+                        [ SNew(STextBlock).Text(LOCTEXT("SourcePrevLbl", "Source:")) ]
+                        + SVerticalBox::Slot().AutoHeight().Padding(2)
+                        [
+                            SNew(SBox).MinDesiredHeight(90)
+                            [ SNew(STextBlock).Font(FAppStyle::GetFontStyle("Monospaced")).Text(this, &STagGenWidget::GetSourcePreviewText) ]
+                        ]
+                    ]
+                ]
+            ]
+
+            /* ================  BOTTOM ACTION ROW  ===================== */
+            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0,6,0,0)
+            [
+                SNew(SButton)
+                .Text(LOCTEXT("Generate", "Generate"))
+                .IsEnabled_Lambda([this]{ return CanGenerate(); })
+                .OnClicked(this, &STagGenWidget::OnGenerateClicked)
             ]
         ]
     ];
