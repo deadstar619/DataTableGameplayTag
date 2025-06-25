@@ -27,7 +27,6 @@ private:
 	TSharedRef<SWidget> MakeDataTablePicker();
 	TSharedRef<SWidget> MakeModuleCombo();
 	bool CanGenerate() const;
-	
 	FText GetPathPreviewText() const;
 	FText GetHeaderPreviewText() const;
 	FText GetSourcePreviewText() const;

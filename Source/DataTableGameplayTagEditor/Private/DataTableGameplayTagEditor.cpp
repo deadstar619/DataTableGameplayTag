@@ -35,13 +35,13 @@ void FDataTableGameplayTagEditorModule::ShutdownModule()
 void FDataTableGameplayTagEditorModule::RegisterMenus()
 {
 	FToolMenuOwnerScoped Owner("GameplayTagGenerator");
-	UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
-	FToolMenuSection& Section = Menu->FindOrAddSection("WindowLayout");
+	UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Tools");
+	FToolMenuSection& Section = Menu->FindOrAddSection("Tools");
 	Section.AddMenuEntry(
 		"OpenTagGen",
 		LOCTEXT("OpenTagGen", "Gameplay Tags Generator"),
 		LOCTEXT("OpenTagGenTT", "Open the gameplay-tag code generator."),
-		FSlateIcon(),
+		FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Convert"),
 		FUIAction(FExecuteAction::CreateLambda([] {
 			FGlobalTabmanager::Get()->TryInvokeTab(FTabId("GameplayTagsGenerator"));
 		})));
